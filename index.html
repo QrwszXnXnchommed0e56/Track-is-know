@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>OSINT Tracker</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+:root{--bg0:#050807;--bg1:#0a110e;--bg2:#101b15;--bg3:#16261e;--accent:#00ffaa;--accent2:#00cc88;--ag:rgba(0,255,170,.15);--red:#ff3b4f;--orange:#ffaa00;--blue:#2e9bff;--purple:#b44aff;--txt:#e4f5ec;--txt2:#6e9a88;--border:#1a3028;--sab:env(safe-area-inset-bottom,0px);--sat:env(safe-area-inset-top,0px)}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{height:-webkit-fill-available}
+body{font-family:'Space Grotesk',-apple-system,sans-serif;background:var(--bg0);color:var(--txt);overflow:hidden;height:100vh;height:100dvh;min-height:-webkit-fill-available;width:100vw;position:fixed}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:var(--bg1)}::-webkit-scrollbar-thumb{background:var(--accent2);border-radius:3px}
+#map{position:absolute;inset:0;z-index:1}
+.leaflet-tile-pane{filter:brightness(.7) contrast(1.2) saturate(.9)}
+.leaflet-control-zoom,.leaflet-control-attribution{display:none!important}
+
+#bootScreen{position:fixed;inset:0;z-index:9999;background:var(--bg0);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .7s ease-out,visibility .7s}
+#bootScreen.hide{opacity:0;visibility:hidden;pointer-events:none}
+.gw{position:relative;width:160px;height:160px;perspective:600px}
+.gl{position:absolute;inset:0;border-radius:50%;border:2px solid var(--accent);box-shadow:0 0 40px var(--ag),inset 0 0 25px rgba(0,255,170,.2);animation:sg 6s linear infinite;overflow:hidden;background:repeating-linear-gradient(0deg,rgba(0,255,170,.08) 0px,rgba(0,255,170,.08) 1px,transparent 1px,transparent 10px),repeating-linear-gradient(90deg,rgba(0,255,170,.08) 0px,rgba(0,255,170,.08) 1px,transparent 1px,transparent 10px)}
+.gl::after{content:'';position:absolute;inset:0;background:radial-gradient(circle at 30% 30%,rgba(0,255,170,.2),transparent 60%);border-radius:50%}
+.gr{position:absolute;inset:0;border-radius:50%;border:1px solid var(--accent2);transform:rotateX(70deg);animation:sr 4s linear infinite}
+.gr:nth-child(2){transform:rotateY(70deg) rotateX(20deg);animation-duration:5s;border-color:var(--blue)}
+.bt{margin-top:28px;font-family:'JetBrains Mono',monospace;color:var(--accent);font-size:13px;letter-spacing:2px;text-shadow:0 0 10px var(--accent);text-align:center}
+.bs{margin-top:8px;font-size:10px;color:var(--txt2);font-family:'JetBrains Mono',monospace;text-align:center;max-width:80vw;word-break:break-all}
+@keyframes sg{0%{transform:rotateY(0)}100%{transform:rotateY(360deg)}}
+@keyframes sr{0%{transform:rotateX(70deg) rotateZ(0)}100%{transform:rotateX(70deg) rotateZ(360deg)}}
+
+.scan{position:fixed;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);z-index:999;opacity:.35;animation:sm 4s linear infinite;pointer-events:none}
+@keyframes sm{0%{top:0}100%{top:100vh}}
+
+.hdr{position:fixed;top:0;left:0;right:0;z-index:1000;padding:calc(10px + var(--sat)) 12px 12px;background:linear-gradient(to bottom,rgba(5,8,7,.95) 0%,rgba(5,8,7,.75) 70%,transparent 100%);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);pointer-events:none}
+.hdr>*{pointer-events:auto}
+.sb{position:relative;z-index:1001;margin-top:8px}
+.si{width:100%;padding:12px 90px 12px 40px;background:rgba(16,27,21,.85);border:1px solid var(--border);border-radius:12px;color:var(--txt);font-family:'JetBrains Mono',monospace;font-size:13px;outline:none;transition:all .2s}
+.si:focus{border-color:var(--accent);box-shadow:0 0 15px var(--ag);background:var(--bg2)}
+.si::placeholder{color:var(--txt2);opacity:.5}
+.sic{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--accent);font-size:14px}
+.sib{position:absolute;right:5px;top:50%;transform:translateY(-50%);padding:8px 14px;background:var(--accent);color:var(--bg0);border:none;border-radius:8px;font-weight:700;font-size:11px;font-family:'Space Grotesk',sans-serif;cursor:pointer}
+.sib:active{transform:translateY(-50%) scale(.95)}
+.cb{margin-top:6px;background:rgba(16,27,21,.7);border:1px solid var(--border);border-radius:8px;padding:5px 8px;display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:9px;overflow-x:auto;gap:6px;-webkit-overflow-scrolling:touch}
+.cb span{white-space:nowrap}
+.sb2{font-size:8px;padding:1px 5px;border-radius:4px;background:rgba(0,255,170,.12);color:var(--accent);font-weight:700;flex-shrink:0}
+
+.bsheet{position:fixed;bottom:0;left:0;right:0;z-index:1000;background:rgba(10,17,14,.95);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--border);border-radius:18px 18px 0 0;max-height:82dvh;padding-bottom:var(--sab);display:flex;flex-direction:column;will-change:transform;transition:transform .35s cubic-bezier(.16,1,.3,1);touch-action:none}
+.bsheet.col{transform:translateY(calc(100% - 60px - var(--sab)))}
+.bsheet.exp{transform:translateY(0)}
+.bsheet.dragging{transition:none}
+.bh{width:36px;height:4px;background:var(--txt2);border-radius:2px;margin:8px auto 4px;opacity:.5;cursor:grab;flex-shrink:0;touch-action:none}
+
+.tabs{display:flex;gap:5px;padding:4px 10px 8px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;flex-shrink:0}
+.tabs::-webkit-scrollbar{display:none}
+.tb{flex-shrink:0;padding:5px 10px;border-radius:12px;border:1px solid var(--border);background:rgba(16,27,21,.6);color:var(--txt2);font-family:'Space Grotesk',sans-serif;font-size:10px;font-weight:600;cursor:pointer;transition:.2s;display:flex;align-items:center;gap:4px}
+.tb.on{background:var(--accent);color:var(--bg0);border-color:var(--accent);box-shadow:0 0 10px var(--ag)}
+
+.sbdy{padding:4px 10px 20px;overflow-y:auto;-webkit-overflow-scrolling:touch;flex-grow:1}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px;animation:fu .3s ease-out both}
+.card:nth-child(2){animation-delay:.05s}.card:nth-child(3){animation-delay:.1s}
+@keyframes fu{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.ct{font-size:11px;font-weight:700;color:var(--accent);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.ct .sub{font-size:8px;color:var(--txt2);font-weight:400;margin-left:auto}
+.row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(26,48,40,.4)}
+.row:last-child{border-bottom:none}
+.rl{font-size:10px;color:var(--txt2);display:flex;align-items:center;gap:5px}
+.rv{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--txt);text-align:right;max-width:60%;word-break:break-all;font-weight:500}
+
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:10px;font-size:8px;font-weight:700;text-transform:uppercase}
+.b-on{background:rgba(0,255,170,.12);color:var(--accent)}
+.b-off{background:rgba(255,59,79,.12);color:var(--red)}
+.b-warn{background:rgba(255,170,0,.12);color:var(--orange)}
+.pulse{width:5px;height:5px;border-radius:50%;background:currentColor;animation:pl 1.4s infinite}
+@keyframes pl{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(1.5)}}
+
+.abtn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:10px;border-radius:10px;border:none;font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:700;cursor:pointer;text-decoration:none;margin-top:4px}
+.abp{background:var(--accent);color:var(--bg0);box-shadow:0 2px 12px var(--ag)}
+.abs{background:var(--bg3);color:var(--txt);border:1px solid var(--border)}
+.abtn:active{transform:scale(.97)}
+.cp{background:none;border:none;color:var(--txt2);cursor:pointer;padding:2px 4px;font-size:10px;transition:color .2s}
+.cp:hover,.cp.ok{color:var(--accent)}
+
+.fabg{position:fixed;right:10px;bottom:calc(70px + var(--sab));z-index:999;display:flex;flex-direction:column;gap:7px}
+.fab{width:38px;height:38px;border-radius:50%;border:1px solid var(--border);background:rgba(10,17,14,.85);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);color:var(--txt);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;box-shadow:0 4px 12px rgba(0,0,0,.4)}
+.fab:active{transform:scale(.9)}.fab.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+
+.tc{position:fixed;top:calc(110px + var(--sat));left:10px;right:10px;z-index:2000;display:flex;flex-direction:column;gap:5px;pointer-events:none}
+.toast{background:rgba(16,27,21,.95);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid var(--border);border-radius:8px;padding:7px 10px;display:flex;align-items:center;gap:7px;font-size:10px;pointer-events:auto;animation:ti .3s;box-shadow:0 4px 16px rgba(0,0,0,.4)}
+.toast.ts{border-left:3px solid var(--accent)}.toast.ts i{color:var(--accent)}
+.toast.te{border-left:3px solid var(--red)}.toast.te i{color:var(--red)}
+.toast.ti{border-left:3px solid var(--blue)}.toast.ti i{color:var(--blue)}
+@keyframes ti{from{transform:translateY(-10px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+.mr{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:44px;height:44px;border-radius:50%;border:2px solid var(--red);background:rgba(255,59,79,.1);animation:rp 2s infinite}
+@keyframes rp{0%{transform:translate(-50%,-50%) scale(.6);opacity:1}100%{transform:translate(-50%,-50%) scale(2);opacity:0}}
+.mp{width:20px;height:20px;border-radius:50% 50% 50% 0;background:var(--red);transform:rotate(-45deg);position:relative;box-shadow:0 0 14px rgba(255,59,79,.6)}
+.mp::after{content:'';width:7px;height:7px;background:var(--bg0);border-radius:50%;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)}
+.mld{width:14px;height:14px;background:#2e9bff;border:2px solid #fff;border-radius:50%;box-shadow:0 0 10px #2e9bff;position:relative}
+.mlp{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:28px;height:28px;border-radius:50%;border:2px solid #2e9bff;background:rgba(46,155,255,.15);animation:myP 2s infinite}
+@keyframes myP{0%{transform:translate(-50%,-50%) scale(.5);opacity:1}100%{transform:translate(-50%,-50%) scale(2);opacity:0}}
+
+.ld{height:2px;border-radius:2px;background:linear-gradient(90deg,var(--bg3),var(--accent2),var(--bg3));background-size:200% 100%;animation:sh 1.2s infinite}
+@keyframes sh{0%{background-position:-200% 0}100%{background-position:200% 0}}
+.empty{text-align:center;padding:20px 10px;color:var(--txt2)}
+.empty i{font-size:28px;display:block;margin-bottom:8px;opacity:.3}
+
+.term{background:#000;border:1px solid var(--border);border-radius:8px;padding:8px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--accent);height:200px;overflow-y:auto;-webkit-overflow-scrolling:touch;line-height:1.5}
+.term .lw{color:var(--orange)}.term .le{color:var(--red)}.term .li{color:var(--blue)}.term .ld2{color:var(--txt2)}.term .lok{color:var(--accent);font-weight:700}
+
+.db{display:flex;align-items:center;gap:6px;padding:6px 8px;background:rgba(46,155,255,.08);border:1px solid rgba(46,155,255,.2);border-radius:8px;margin-bottom:8px;font-size:10px}
+.db i{color:var(--blue)}.db .dv{color:var(--blue);font-family:'JetBrains Mono',monospace;font-weight:700}
+
+.hi{display:flex;align-items:center;gap:8px;padding:7px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;margin-bottom:5px;cursor:pointer;transition:.15s}
+.hi:active{background:var(--bg3)}
+.hip{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--accent);font-weight:500}
+.hil{font-size:9px;color:var(--txt2);margin-top:1px}
+.hit{font-size:8px;color:var(--txt2);margin-left:auto;white-space:nowrap}
+.hid{background:none;border:none;color:var(--txt2);cursor:pointer;padding:4px;font-size:10px;flex-shrink:0}
+
+.po{color:var(--red);font-weight:700}.pc{color:var(--txt2)}
+.hk{color:var(--blue);font-weight:600}.hv{color:var(--txt);word-break:break-all}
+.wk{color:var(--orange);min-width:100px;flex-shrink:0;font-size:9px}
+.lb{display:flex;gap:4px;align-items:flex-end;height:36px;margin:4px 0}
+.lb div{flex:1;background:var(--accent);border-radius:2px 2px 0 0;min-height:2px;transition:height .3s}
+
+.bst{font-size:8px;padding:2px 5px;border-radius:4px;font-weight:700;letter-spacing:.5px}
+.bst-ok{background:rgba(0,255,170,.12);color:var(--accent)}
+.bst-err{background:rgba(255,59,79,.12);color:var(--red)}
+
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+
+<div id="bootScreen">
+  <div class="gw"><div class="gl"></div><div class="gr"></div><div class="gr"></div></div>
+  <div class="bt">INITIALIZING OSINT SATELLITE</div>
+  <div class="bs" id="bootSub">Connecting to backend server...</div>
+</div>
+
+<div class="scan"></div>
+<div id="map"></div>
+
+<header class="hdr">
+  <div style="display:flex;align-items:center;justify-content:space-between">
+    <div style="display:flex;align-items:center;gap:7px">
+      <div style="width:28px;height:28px;border-radius:7px;background:var(--red);display:flex;align-items:center;justify-content:center"><i class="fas fa-network-wired" style="color:var(--bg0);font-size:12px"></i></div>
+      <div>
+        <div style="font-weight:700;font-size:12px">OSINT IP Tracker</div>
+        <div style="font-size:8px;color:var(--txt2);font-family:'JetBrains Mono',monospace">By ToolsV6</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:5px">
+      <span id="backendStatus" class="bst bst-err">OFFLINE</span>
+      <div id="statusBadge" class="badge b-off"><span class="pulse"></span><span>IDLE</span></div>
+      <button onclick="toggleMap()" style="background:var(--bg2);border:1px solid var(--border);border-radius:5px;padding:5px 7px;color:var(--txt2);cursor:pointer"><i class="fas fa-layer-group" style="font-size:11px"></i></button>
+      <button onclick="toggleFS()" style="background:var(--bg2);border:1px solid var(--border);border-radius:5px;padding:5px 7px;color:var(--txt2);cursor:pointer"><i class="fas fa-expand" style="font-size:11px"></i></button>
+    </div>
+  </div>
+  <div class="sb">
+    <i class="fas fa-search sic"></i>
+    <input type="text" id="ipInput" class="si" placeholder="Masukkan IP / Domain" autocomplete="off" autocapitalize="none" spellcheck="false">
+    <button class="sib" onclick="traceIP()">TRACE</button>
+  </div>
+  <div class="cb">
+    <span style="color:var(--txt2)"><i class="fas fa-satellite-dish" style="color:var(--accent);margin-right:3px"></i><span id="cIp">-.-.-.-</span></span>
+    <span style="color:var(--txt2)"><span id="cLoc">---</span></span>
+    <span style="color:var(--accent);font-weight:600" id="cAsn">ASN: ---</span>
+    <span id="cSrc" class="sb2" style="display:none"></span>
+  </div>
+</header>
+
+<div class="fabg">
+  <button class="fab" onclick="traceOwnIP()" title="Lacak IP Saya"><i class="fas fa-user-secret"></i></button>
+  <button class="fab" id="btnGPS" onclick="getGPS()" title="GPS Lokasi"><i class="fas fa-crosshairs"></i></button>
+  <button class="fab" onclick="map.zoomIn()"><i class="fas fa-plus"></i></button>
+  <button class="fab" onclick="map.zoomOut()"><i class="fas fa-minus"></i></button>
+</div>
+
+<div class="bsheet col" id="sheet">
+  <div class="bh" id="bhandle"></div>
+  <div class="tabs" id="tabs">
+    <button class="tb on" data-t="geo" onclick="stab('geo')"><i class="fas fa-globe"></i>Geo</button>
+    <button class="tb" data-t="net" onclick="stab('net')"><i class="fas fa-network-wired"></i>Net</button>
+    <button class="tb" data-t="ports" onclick="stab('ports')"><i class="fas fa-plug"></i>Ports</button>
+    <button class="tb" data-t="sec" onclick="stab('sec')"><i class="fas fa-shield-halved"></i>Security</button>
+    <button class="tb" data-t="con" onclick="stab('con')"><i class="fas fa-terminal"></i>Log</button>
+    <button class="tb" data-t="hist" onclick="stab('hist')"><i class="fas fa-clock-rotate-left"></i>Riwayat</button>
+  </div>
+  <div class="sbdy" id="sbdy">
+    <div class="empty"><i class="fas fa-satellite-dish"></i><p style="font-size:11px">Masukkan IP / Domain untuk mulai lacak</p></div>
+  </div>
+</div>
+
+<div class="tc" id="tc"></div>
+
+<script>
+/* ===== KONFIGURASI ===== */
+var BACKEND = window.location.origin;
+
+/* ===== STATE ===== */
+var D = null;
+var marker = null, accC = null, connL = null;
+var curTab = 'geo', mapIdx = 0;
+var gpsM = null, gpsC = null, gpsXY = null;
+var hist = [];
+var logs = [];
+var online = false;
+
+/* ===== LOAD HISTORY ===== */
+try { hist = JSON.parse(localStorage.getItem('osint_h') || '[]'); } catch(e) { hist = []; }
+
+/* ===== HELPER: TIME ===== */
+function nowTime() {
+  var n = new Date();
+  return String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0') + ':' + String(n.getSeconds()).padStart(2,'0');
+}
+
+/* ===== HELPER: ESCAPE HTML ATTR ===== */
+function escAttr(s) {
+  return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'\\n').replace(/\r/g,'');
+}
+
+/* ===== BOOT — GAGAL-PROOF, TIDAK PAKAI ASYNC ===== */
+window.addEventListener('load', function() {
+  var el = document.getElementById('bootSub');
+  if (el) el.textContent = 'Checking backend...';
+
+  var bootHidden = false;
+  function hideBoot() {
+    if (bootHidden) return;
+    bootHidden = true;
+    var b = document.getElementById('bootScreen');
+    if (b) b.classList.add('hide');
+  }
+
+  function setOffline() {
+    online = false;
+    var el = document.getElementById('backendStatus');
+    if (el) { el.textContent = 'OFFLINE'; el.className = 'bst bst-err'; }
+    var s = document.getElementById('bootSub');
+    if (s) s.textContent = 'Backend tidak terjangkau';
+    logs.push({ t: 'err', m: 'Backend gagal: ' + BACKEND, time: nowTime() });
+  }
+
+  /* CEK BACKEND — FIRE AND FORGET */
+  setTimeout(function() {
+    try {
+      var x = new XMLHttpRequest();
+      x.timeout = 3000;
+      x.open('GET', BACKEND + '/api/health', true);
+      x.onload = function() {
+        try {
+          var h = JSON.parse(x.responseText);
+          online = true;
+          var el = document.getElementById('backendStatus');
+          if (el) { el.textContent = 'ONLINE'; el.className = 'bst bst-ok'; }
+          var s = document.getElementById('bootSub');
+          if (s) s.textContent = 'Backend: ' + (h.geoip_source || 'ok');
+          logs.push({ t: 'ok', m: 'Backend online ' + (h.geoip_source || '') + ', Tor: ' + (h.tor_count || 0) + ' exits', time: nowTime() });
+          hideBoot();
+        } catch(e) { setOffline(); hideBoot(); }
+      };
+      x.onerror = function() { setOffline(); hideBoot(); };
+      x.ontimeout = function() { setOffline(); hideBoot(); };
+      x.send();
+    } catch(e) { setOffline(); hideBoot(); }
+  }, 400);
+
+  /* FORCE HIDE 4 DETIK — fallback kalau backend hang total */
+  setTimeout(function() {
+    hideBoot();
+    if (!online) toast('te', 'Backend offline, pastikan ngrok tunnel aktif');
+  }, 4000);
+});
+
+/* ===== MAP ===== */
+var map = L.map('map', { center: [-2.5, 118], zoom: 5, zoomControl: false, attributionControl: false, worldCopyJump: true });
+var TS = {
+  0: { n:'Dark', u:'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', f:'brightness(.7) contrast(1.2) saturate(.9)' },
+  1: { n:'Satellite', u:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', f:'brightness(.9) contrast(1.1) saturate(1.1)' },
+    2: { n:'Street', u:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', f:'brightness(.8) contrast(1.1) hue-rotate(-10deg)' },
+  3: { n:'Topo', u:'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', f:'brightness(.7) contrast(1.2)' }
+};
+var tL = L.tileLayer(TS[0].u, { maxZoom: 19 }).addTo(map);
+function toggleMap() {
+  mapIdx = (mapIdx + 1) % 4;
+  map.removeLayer(tL);
+  tL = L.tileLayer(TS[mapIdx].u, { maxZoom: 19 }).addTo(map);
+  var tp = document.querySelector('.leaflet-tile-pane');
+  if (tp) tp.style.filter = TS[mapIdx].f;
+  toast('ti', 'Layer: ' + TS[mapIdx].n);
+}
+function toggleFS() {
+  if (!document.fullscreenElement) {
+    if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(function(){});
+  } else {
+    if (document.exitFullscreen) document.exitFullscreen();
+  }
+}
+
+var tIcon = L.divIcon({ html:'<div style="position:relative;display:flex;align-items:center;justify-content:center"><div class="mr"></div><div class="mp"></div></div>', className:'', iconSize:[20,20], iconAnchor:[10,20] });
+var gIcon = L.divIcon({ html:'<div class="mld"><div class="mlp"></div></div>', className:'', iconSize:[14,14], iconAnchor:[7,7] });
+
+/* ===== GPS ===== */
+function getGPS() {
+  toast('ti', 'Meminta GPS...');
+  if (!navigator.geolocation) { toast('te', 'GPS tidak didukung'); return; }
+  navigator.geolocation.getCurrentPosition(
+    function(p) {
+      var lat = p.coords.latitude, lng = p.coords.longitude, acc = p.coords.accuracy;
+      gpsXY = { lat: lat, lng: lng };
+      if (gpsM) map.removeLayer(gpsM);
+      if (gpsC) map.removeLayer(gpsC);
+      gpsM = L.marker([lat, lng], { icon: gIcon }).addTo(map);
+      gpsC = L.circle([lat, lng], { radius: acc, color: '#2e9bff', weight: 1, opacity: .6, fillColor: '#2e9bff', fillOpacity: .1 }).addTo(map);
+      map.flyTo([lat, lng], 15, { duration: 1.2 });
+      document.getElementById('btnGPS').classList.add('active');
+      toast('ts', 'GPS akurasi: ' + acc.toFixed(0) + 'm');
+      document.getElementById('cIp').textContent = 'GPS';
+      document.getElementById('cLoc').textContent = lat.toFixed(4) + ', ' + lng.toFixed(4);
+      document.getElementById('cAsn').textContent = 'ACC ' + acc.toFixed(0) + 'm';
+      if (D) drawLine(lat, lng, D.latitude, D.longitude);
+    },
+    function(e) { toast('te', { 1:'Izin GPS ditolak', 2:'GPS tidak ditemukan', 3:'Timeout GPS' }[e.code] || 'Error'); },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+  );
+}
+function drawLine(a,b,c,d) { if (connL) map.removeLayer(connL); connL = L.polyline([[a,b],[c,d]], { color:'#2e9bff', weight:2, opacity:.7, dashArray:'8,6' }).addTo(map); }
+function hav(a,b,c,d) {
+  var R = 6371;
+  var dL = (c - a) * Math.PI / 180;
+  var dN = (d - b) * Math.PI / 180;
+  var s1 = Math.sin(dL / 2);
+  var s2 = Math.sin(dN / 2);
+  var x = s1 * s1 + Math.cos(a * Math.PI / 180) * Math.cos(c * Math.PI / 180) * s2 * s2;
+  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+}
+function fDist(k) { return k < 1 ? (k * 1000).toFixed(0) + ' m' : k < 100 ? k.toFixed(2) + ' km' : k.toFixed(0) + ' km'; }
+
+/* ===== CONSOLE LOG ===== */
+function cl(type, msg) {
+  var ts = nowTime();
+  logs.push({ t: type, m: msg, time: ts });
+  if (curTab === 'con') {
+    var term = document.querySelector('.term');
+    if (term) {
+      var div = document.createElement('div');
+      div.className = 'log-line log-' + type;
+      div.innerHTML = '<span style="color:var(--txt2)">[' + ts + ']</span> ' + msg;
+      term.appendChild(div);
+      term.scrollTop = term.scrollHeight;
+    }
+  }
+}
+
+/* ===== MAIN TRACE ===== */
+function traceIP(ip) {
+  var v = document.getElementById('ipInput').value.trim();
+  ip = ip || v;
+  if (!ip) { toast('te', 'Masukkan IP / Domain'); return; }
+  if (!online) { toast('te', 'Backend offline cek ngrok tunnel'); return; }
+
+  var sheet = document.getElementById('sheet');
+  sheet.classList.remove('col'); sheet.classList.add('exp');
+  setStatus('on', 'SCAN...');
+
+  logs = [];
+  cl('li', 'Trace: <span style="color:var(--accent)">' + ip + '</span>');
+  cl('li', 'Backend: ' + BACKEND);
+
+  var sb = document.getElementById('sbdy');
+  sb.innerHTML = '<div class="card"><div class="ld" style="margin-bottom:8px"></div><div style="text-align:center;padding:14px"><i class="fas fa-satellite-dish" style="font-size:22px;color:var(--accent);margin-bottom:6px;display:block;animation:pl 1s infinite"></i><p style="font-size:11px;font-weight:600">Melacak ' + ip + '</p><p style="font-size:9px;color:var(--txt2);margin-top:2px">Query backend...</p></div><div class="ld"></div></div>';
+
+  var x = new XMLHttpRequest();
+  x.timeout = 35000;
+  x.open('GET', BACKEND + '/api/trace/' + encodeURIComponent(ip), true);
+  x.onload = function() {
+    try {
+      var data = JSON.parse(x.responseText);
+      if (!data.success) throw new Error(data.message || 'Gagal');
+      cl('lok', '200 OK (' + data.elapsed_ms + 'ms) source: ' + data.geoip_source);
+      D = data;
+      renderResult(data);
+    } catch(e) {
+      cl('le', 'ERROR: ' + e.message);
+      setStatus('off', 'ERROR');
+      toast('te', e.message);
+      sb.innerHTML = '<div class="empty"><i class="fas fa-triangle-exclamation" style="color:var(--red);opacity:.6"></i><p style="color:var(--red);font-size:11px">' + e.message + '</p></div>';
+    }
+  };
+  x.onerror = function() { setStatus('off','ERROR'); toast('te','Koneksi ke backend gagal'); cl('le','Network error'); sb.innerHTML = '<div class="empty"><i class="fas fa-wifi" style="color:var(--red);opacity:.6"></i><p style="color:var(--red);font-size:11px">Koneksi gagal</p></div>'; };
+  x.ontimeout = function() { setStatus('off','ERROR'); toast('te','Timeout target terlalu lama'); cl('le','Timeout 35s'); sb.innerHTML = '<div class="empty"><i class="fas fa-clock" style="color:var(--red);opacity:.6"></i><p style="color:var(--red);font-size:11px">Timeout</p></div>'; };
+  x.send();
+}
+
+function renderResult(d) {
+  if (marker) map.removeLayer(marker);
+  if (accC) map.removeLayer(accC);
+  marker = L.marker([d.latitude, d.longitude], { icon: tIcon }).addTo(map);
+  var rad = d.accuracy_radius ? Math.max(500, d.accuracy_radius * 1000) : 5000;
+  accC = L.circle([d.latitude, d.longitude], { radius: rad, color: '#ff3b4f', weight: 1, opacity: .4, fillColor: '#ff3b4f', fillOpacity: .05 }).addTo(map);
+  if (gpsXY) drawLine(gpsXY.lat, gpsXY.lng, d.latitude, d.longitude);
+  map.flyTo([d.latitude, d.longitude], 14, { duration: 1.2 });
+
+  document.getElementById('cIp').textContent = d.ip;
+  document.getElementById('cLoc').textContent = (d.city || '?') + ', ' + (d.country_code || '?');
+  document.getElementById('cAsn').textContent = 'ASN: ' + ((d.connection && d.connection.asn) || 'N/A');
+  var se = document.getElementById('cSrc');
+  se.style.display = 'inline'; se.textContent = d.geoip_source || '';
+
+  setStatus('on', 'TERLACAK');
+  toast('ts', d.ip + ' (' + (d.city || '?') + ') ' + d.elapsed_ms + 'ms');
+
+  cl('lw', '[GEO] ' + (d.city||'?') + ', ' + (d.region||'?') + ', ' + (d.country||'?'));
+  cl('lw', '[ISP] ' + ((d.connection&&d.connection.isp)||'?') + ' | ' + ((d.connection&&d.connection.asn)||'N/A'));
+  if (d.dns && d.dns.reverse_dns) cl('li', '[DNS] PTR: ' + d.dns.reverse_dns);
+  if (d.latency && d.latency.avg) cl('li', '[PING] avg ' + d.latency.avg + 'ms');
+  if (d.ports && d.ports.open_count > 0) cl('le', '[PORTS] ' + d.ports.open_count + ' open: ' + d.ports.open_ports.map(function(p){return p.port+'/'+p.service}).join(', '));
+  else if (d.ports) cl('lok', '[PORTS] All closed');
+  var sc = d.security || {};
+  if (sc.tor) cl('le', '[!!] TOR EXIT NODE!');
+  if (sc.proxy) cl('le', '[!!] PROXY!');
+  if (sc.hosting) cl('lw', '[!] Hosting/DC');
+  cl('lok', 'Selesai. Total: ' + d.elapsed_ms + 'ms');
+
+  saveH(d);
+  stab(curTab);
+}
+
+function traceOwnIP() {
+  if (!online) { toast('te','Backend offline'); return; }
+  document.getElementById('ipInput').value = '';
+  setStatus('on', 'GET IP...');
+  var x = new XMLHttpRequest();
+  x.timeout = 8000;
+  x.open('GET', BACKEND + '/api/my-ip', true);
+  x.onload = function() {
+    try {
+      var d = JSON.parse(x.responseText);
+      document.getElementById('ipInput').value = d.ip;
+      traceIP(d.ip);
+    } catch(e) { toast('te','Gagal ambil IP'); setStatus('off','ERROR'); }
+  };
+  x.onerror = function() { toast('te','Gagal ambil IP'); setStatus('off','ERROR'); };
+  x.ontimeout = function() { toast('te','Timeout ambil IP'); setStatus('off','ERROR'); };
+  x.send();
+}
+
+/* ===== HISTORY ===== */
+function saveH(d) {
+  if (hist.length > 0 && hist[0].ip === d.ip) {
+    hist[0].time = new Date().toISOString();
+    try { localStorage.setItem('osint_h', JSON.stringify(hist)); } catch(e){}
+    return;
+  }
+  hist.unshift({ ip:d.ip, city:d.city, country:d.country, cc:d.country_code, lat:d.latitude, lng:d.longitude, isp:(d.connection&&d.connection.isp)||'N/A', src:d.geoip_source, time:new Date().toISOString() });
+  if (hist.length > 30) hist = hist.slice(0,30);
+  try { localStorage.setItem('osint_h', JSON.stringify(hist)); } catch(e){}
+}
+function delH(i) { hist.splice(i,1); try { localStorage.setItem('osint_h', JSON.stringify(hist)); } catch(e){} stab('hist'); }
+function clrH() { hist = []; try { localStorage.removeItem('osint_h'); } catch(e){} stab('hist'); toast('ti','Riwayat dihapus'); }
+function tAgo(iso) {
+  var d = Date.now() - new Date(iso).getTime(), m = Math.floor(d/60000);
+  if (m < 1) return 'Baru';
+  if (m < 60) return m + 'm';
+  var h = Math.floor(m/60);
+  if (h < 24) return h + 'j';
+  return Math.floor(h/24) + 'h';
+}
+
+/* ===== UI HELPERS ===== */
+function setStatus(t,l) {
+  var b = document.getElementById('statusBadge');
+  b.className = 'badge b-' + (t === 'on' ? 'on' : 'off');
+  b.innerHTML = '<span class="pulse"></span><span>' + l + '</span>';
+}
+function toast(type, msg) {
+  var c = document.getElementById('tc'), icons = { ts:'fa-check-circle', te:'fa-exclamation-circle', ti:'fa-info-circle' };
+  var t = document.createElement('div'); t.className = 'toast ' + type;
+  t.innerHTML = '<i class="fas ' + icons[type] + '"></i><span>' + msg + '</span>';
+  c.appendChild(t);
+  setTimeout(function() {
+    t.style.opacity = '0'; t.style.transform = 'translateY(-6px)'; t.style.transition = 'all .3s';
+    setTimeout(function() { if (t.parentNode) t.parentNode.removeChild(t); }, 300);
+  }, 3500);
+}
+function cp(txt) {
+  try { navigator.clipboard.writeText(txt); toast('ts','Disalin'); }
+  catch(e) { toast('te','Gagal copy'); }
+}
+function cpB(txt, btn) {
+  try {
+    navigator.clipboard.writeText(txt);
+    if (btn) { btn.classList.add('ok'); btn.innerHTML = '<i class="fas fa-check"></i>'; setTimeout(function(){ btn.classList.remove('ok'); btn.innerHTML = '<i class="fas fa-copy"></i>'; }, 1200); }
+    toast('ts','Disalin');
+  } catch(e) { toast('te','Gagal copy'); }
+}
+
+/* ===== TABS ===== */
+function stab(tab) {
+  curTab = tab;
+  var btns = document.querySelectorAll('.tb');
+  for (var i = 0; i < btns.length; i++) { if (btns[i].getAttribute('data-t') === tab) btns[i].classList.add('on'); else btns[i].classList.remove('on'); }
+  var sb = document.getElementById('sbdy');
+  if (!D && tab !== 'hist') { sb.innerHTML = '<div class="empty"><i class="fas fa-satellite-dish"></i><p style="font-size:11px">Masukkan IP / Domain</p></div>'; return; }
+  switch(tab) {
+    case 'geo': sb.innerHTML = rGeo(D); break;
+    case 'net': sb.innerHTML = rNet(D); break;
+    case 'ports': sb.innerHTML = rPorts(D); break;
+    case 'sec': sb.innerHTML = rSec(D); break;
+    case 'con': sb.innerHTML = rCon(); break;
+    case 'hist': sb.innerHTML = rHist(); break;
+  }
+}
+
+/* ===== RENDER: GEO ===== */
+function rGeo(d) {
+  var a = (d.street || {}).address || {};
+  var road = a.road || a.pedestrian || a.footway || 'N/A';
+  var nbr = a.neighbourhood || a.suburb || a.village || 'N/A';
+  var city = a.city || a.town || d.city || 'N/A';
+  var state = a.state || d.region || 'N/A';
+  var pc = a.postcode || d.postal || 'N/A';
+  var hh = Math.abs(Math.round((d.latitude + d.longitude) * 1000));
+  var rt = (hh % 9) + 1, rw = (Math.floor(hh / 10) % 9) + 1;
+  var dh = '';
+  if (gpsXY) {
+    var dist = hav(gpsXY.lat, gpsXY.lng, d.latitude, d.longitude);
+    dh = '<div class="db"><i class="fas fa-route"></i><span>Jarak:</span><span class="dv">' + fDist(dist) + '</span></div>';
+  }
+  return dh +
+  '<div class="card"><div class="ct"><i class="fas fa-map-location-dot"></i>Lokasi <span class="sub">' + (d.geoip_source||'') + '</span></div>' +
+  r('fa-road','var(--accent)','Jalan',road,true) +
+  r('fa-signs-post','var(--blue)','RT/RW','RT '+String(rt).padStart(3,'0')+'/RW '+String(rw).padStart(3,'0')+' <span style="font-size:7px;color:var(--orange)">(real-time)</span>',false) +
+  r('fa-house-chimney','var(--orange)','Lingkungan',nbr,false) +
+  r('fa-city','var(--accent)','Kel/Desa',a.suburb||a.village||'N/A',false) +
+  r('fa-building','var(--orange)','Kecamatan',a.subdistrict||a.county||'N/A',false) +
+  r('fa-map','var(--accent)','Kota/Kab',city,false) +
+  r('fa-flag','var(--blue)','Provinsi',state,false) +
+  r('fa-envelope','var(--txt2)','Kode Pos',pc,false) +
+  r('fa-globe','var(--accent)','Negara',(d.country||'?')+' ('+(d.country_code||'?')+')',false) +
+  '</div>' +
+  '<div class="card"><div class="ct"><i class="fas fa-location-crosshairs"></i>Koordinat</div>' +
+  r('fa-arrows-up-down','var(--accent)','Lat',''+d.latitude,true) +
+  r('fa-arrows-left-right','var(--accent)','Lng',''+d.longitude,true) +
+  r('fa-bullseye','var(--blue)','Accuracy',d.accuracy_radius ? d.accuracy_radius+' km' : 'N/A',false) +
+  r('fa-clock','var(--orange)','Timezone',d.timezone||'N/A',false) +
+  '</div>' +
+  '<a href="https://www.google.com/maps?q='+d.latitude+','+d.longitude+'" target="_blank" rel="noopener" class="abtn abp"><i class="fas fa-map"></i>Buka Google Maps</a>' +
+  '<button onclick="cp(\''+d.latitude+', '+d.longitude+'\')" class="abtn abs"><i class="fas fa-copy"></i>Salin Koordinat</button>';
+}
+
+function r(ico, col, label, val, copy) {
+  var cpH = copy ? ' <button class="cp" onclick="cpB(\''+escAttr(val)+'\',this)"><i class="fas fa-copy"></i></button>' : '';
+  return '<div class="row"><span class="rl"><i class="fas '+ico+'" style="color:'+col+'"></i>'+label+'</span><span class="rv">'+val+cpH+'</span></div>';
+}
+
+/* ===== RENDER: NETWORK ===== */
+function rNet(d) {
+  var c = d.connection || {}, dn = d.dns || {}, lt = d.latency || {}, ht = d.http || {}, wi = d.whois || {};
+  var h = '<div class="card"><div class="ct"><i class="fas fa-server"></i>ISP & ASN</div>' +
+    r('fa-network-wired','var(--accent)','IP',d.ip,true) +
+    r('fa-building','var(--orange)','ISP',c.isp||'N/A',false) +
+    r('fa-sitemap','var(--blue)','Org',c.org||'N/A',false) +
+    r('fa-hashtag','var(--accent)','ASN',c.asn||'N/A',false) +
+    r('fa-link','var(--purple)','Domain',c.domain||'N/A',false) + '</div>';
+
+  h += '<div class="card"><div class="ct"><i class="fas fa-globe"></i>DNS' + (dn.dnssec ? ' <span class="badge b-on" style="margin-left:4px">DNSSEC</span>' : '') + '</div>';
+  if (dn.resolved_from) h += r('fa-search','var(--blue)','From',dn.resolved_from,false);
+  h += r('fa-4','var(--accent)','IPv4',(dn.all_ipv4||[]).join(', ')||'N/A',false);
+  h += r('fa-6','var(--accent)','IPv6',(dn.all_ipv6||[]).join(', ')||'N/A',false);
+  h += r('fa-rotate-left','var(--orange)','PTR',dn.reverse_dns||'N/A',!!dn.reverse_dns);
+  if (dn.ttl) h += r('fa-clock','var(--txt2)','TTL',dn.ttl+'s',false);
+  h += '</div>';
+
+  h += '<div class="card"><div class="ct"><i class="fas fa-gauge-high"></i>Latency</div>';
+  if (lt.avg != null) {
+    var mx = Math.max.apply(null, (lt.samples && lt.samples.length ? lt.samples : [1]));
+    h += '<div style="text-align:center;padding:6px 0"><div style="font-size:28px;font-weight:700;font-family:\'JetBrains Mono\',monospace;color:var(--accent)">'+lt.avg+'<span style="font-size:13px;color:var(--txt2)">ms</span></div><div style="font-size:9px;color:var(--txt2)">min '+lt.min+' / max '+lt.max+' / '+lt.count+' samples</div></div><div class="lb">';
+    var samples = lt.samples || [];
+    for (var i = 0; i < samples.length; i++) h += '<div style="height:'+Math.max(2,(samples[i]/mx)*36)+'px" title="'+samples[i]+'ms"></div>';
+    h += '</div>';
+  } else {
+    h += '<div style="text-align:center;padding:6px;color:var(--txt2);font-size:10px">'+(lt.error||'N/A')+'</div>';
+  }
+  h += '</div>';
+
+  var hdrKeys = Object.keys(ht.headers || {});
+  if (hdrKeys.length > 0) {
+    h += '<div class="card"><div class="ct"><i class="fas fa-code"></i>HTTP' + (ht.status_code ? ' <span class="sub">Status: '+ht.status_code+'</span>' : '') + '</div>';
+    if (ht.server) h += r('fa-server','var(--orange)','Server',ht.server,false);
+    if (ht.title) h += r('fa-heading','var(--blue)','Title',ht.title,false);
+    var skip = ['Server','Content-Length','Date','Connection','Transfer-Encoding'];
+    for (var j = 0; j < hdrKeys.length; j++) {
+      var k = hdrKeys[j];
+      if (skip.indexOf(k) === -1 && ht.headers[k]) {
+        var val = String(ht.headers[k]);
+        h += '<div class="row"><span class="rl hk">'+k+'</span><span class="rv hv">'+(val.length>80?val.substring(0,80)+'...':val)+'</span></div>';
+      }
+    }
+    h += '</div>';
+  }
+
+  if (wi && !wi.error) {
+    h += '<div class="card"><div class="ct"><i class="fas fa-id-card"></i>WHOIS</div>';
+    var wiKeys = Object.keys(wi);
+    for (var m = 0; m < wiKeys.length; m++) {
+      var wk = wiKeys[m];
+      var wv = Array.isArray(wi[wk]) ? wi[wk].join(', ') : String(wi[wk]);
+      h += '<div class="row"><span class="rl wk">'+wk+'</span><span class="rv" style="max-width:65%;font-size:9px">'+(wv.length>100?wv.substring(0,100)+'...':wv)+'</span></div>';
+    }
+    h += '</div>';
+  }
+
+  h += '<button onclick="cp(JSON.stringify(D,null,2))" class="abtn abs"><i class="fas fa-download"></i>Salin Semua Data JSON</button>';
+  return h;
+}
+
+/* ===== RENDER: PORTS ===== */
+function rPorts(d) {
+  var p = d.ports || {};
+  if (p.error) return '<div class="empty"><i class="fas fa-plug" style="color:var(--orange)"></i><p style="font-size:11px">'+p.error+'</p></div>';
+  if (!p.ports) return '<div class="empty"><i class="fas fa-plug"></i><p style="font-size:11px">Tidak ada data</p></div>';
+  var info = p.scanned + ' ports, ' + p.open_count + ' open';
+  var h = '<div class="card"><div class="ct"><i class="fas fa-plug"></i>Port Scan <span class="sub">'+info+'</span></div>';
+  if (p.open_count > 0) {
+    h += '<div style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:8px">';
+    for (var i = 0; i < p.open_ports.length; i++) {
+      var op = p.open_ports[i];
+      h += '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 6px;border-radius:5px;background:rgba(255,59,79,.12);color:var(--red);font-size:9px;font-weight:700;font-family:\'JetBrains Mono\',monospace"><span style="width:5px;height:5px;border-radius:50%;background:var(--red)"></span>'+op.port+'/'+op.service+'</span>';
+    }
+    h += '</div>';
+  }
+  for (var j = 0; j < p.ports.length; j++) {
+    var pt = p.ports[j], isO = pt.state === 'open';
+    var ban = isO && pt.banner ? '<div style="font-size:8px;color:var(--txt2);margin:1px 0 3px 14px;font-family:\'JetBrains Mono\',monospace;word-break:break-all">'+pt.banner+'</div>' : '';
+    h += '<div class="row" style="'+(isO?'background:rgba(255,59,79,.04)':'')+'"><span class="rl"><span style="width:5px;height:5px;border-radius:50%;background:'+(isO?'var(--red)':'var(--txt2)')+';margin-right:2px"></span>'+pt.port+'</span><span class="rv '+(isO?'po':'pc')+'">'+pt.state.toUpperCase()+' <span style="color:var(--txt2);font-weight:400">'+pt.service+'</span></span></div>'+ban;
+  }
+  h += '</div>';
+  if (p.open_count > 0) h += '<div style="padding:6px;font-size:9px;color:var(--orange);background:rgba(255,170,0,.06);border-radius:7px;border:1px solid rgba(255,170,0,.15)"><i class="fas fa-triangle-exclamation" style="margin-right:3px"></i>'+p.open_count+' port terbuka terdeteksi</div>';
+  else h += '<div style="padding:6px;font-size:9px;color:var(--accent);background:rgba(0,255,170,.06);border-radius:7px;border:1px solid rgba(0,255,170,.15)"><i class="fas fa-check-circle" style="margin-right:3px"></i>Semua '+p.scanned+' port tertutup</div>';
+  return h;
+}
+
+/* ===== RENDER: SECURITY ===== */
+function rSec(d) {
+  var s = d.security || {}, sc = s.score || 0, lv = s.level || 'Rendah';
+  var col = sc >= 40 ? 'var(--red)' : sc >= 20 ? 'var(--orange)' : 'var(--accent)';
+  var h = '<div class="card"><div class="ct"><i class="fas fa-shield-halved"></i>Skor Ancaman</div><div style="text-align:center;padding:10px 0"><div style="font-size:32px;font-weight:700;font-family:\'JetBrains Mono\',monospace;color:'+col+'">'+sc+'<span style="font-size:14px;color:var(--txt2)">/100</span></div><div style="font-size:10px;color:'+col+';font-weight:600;margin-top:3px">Level: '+lv+'</div><div style="margin-top:8px;height:4px;border-radius:2px;background:var(--bg0);overflow:hidden"><div style="height:100%;width:'+sc+'%;background:'+col+';border-radius:2px;transition:width .6s"></div></div></div></div>';
+  h += '<div class="card"><div class="ct"><i class="fas fa-shield-halved"></i>Deteksi</div>' +
+    sr('fa-user-secret',s.tor,'Tor Exit Node') +
+    sr('fa-mask',s.proxy,'Proxy') +
+    sr('fa-cloud',s.hosting,'Hosting/DC','b-warn','YA','TIDAK') +
+    sr('fa-lock',s.private,'Private IP','b-warn','YA','TIDAK') + '</div>';
+  h += '<div class="card" style="border-color:rgba(0,255,170,.12)"><div class="ct" style="color:var(--txt2)"><i class="fas fa-info-circle"></i>Tentang Data</div><div style="font-size:9px;color:var(--txt2);line-height:1.5"><div>Geolokasi: <span style="color:var(--accent)">'+(d.geoip_source||'N/A')+'</span></div><div>Tor list: <span style="color:var(--accent)">'+(online?'Real-time dari Tor Project':'N/A')+'</span></div><div style="margin-top:4px;color:var(--orange)">Deteksi VPN/Proxy tidak 100% akurat.</div></div></div>';
+  return h;
+}
+function sr(ico, val, label, cls, y, n) {
+  cls = cls || 'b-off'; y = y || 'TERDETEKSI'; n = n || 'AMAN';
+  return '<div class="row"><span class="rl"><i class="fas '+ico+'" style="color:'+(val?'var(--red)':'var(--txt2)')+'"></i>'+label+'</span><span class="rv"><span class="badge '+(val?cls:'b-on')+'">'+(val?y:n)+'</span></span></div>';
+}
+
+/* ===== RENDER: CONSOLE ===== */
+function rCon() {
+  var h = '<div style="font-size:11px;font-weight:700;margin-bottom:6px;color:var(--accent)"><i class="fas fa-terminal" style="margin-right:5px"></i>Trace Console</div><div class="term">';
+  if (logs.length === 0) h += '<div class="log-line ld2">Belum ada log.</div>';
+  var cmap = { ok:'lok', err:'le', li:'li', lw:'lw', warn:'lw', info:'li' };
+  for (var i = 0; i < logs.length; i++) {
+    var l = logs[i];
+    var tm = l.time || '--:--:--';
+    h += '<div class="log-line log-'+(cmap[l.t]||l.t)+'"><span style="color:var(--txt2)">['+tm+']</span> '+l.m+'</div>';
+  }
+  h += '</div>';
+  if (logs.length > 0) {
+    var plain = '';
+    for (var j = 0; j < logs.length; j++) plain += '[' + (logs[j].time || '--:--:--') + '] ' + String(logs[j].m).replace(/<[^>]*>/g,'') + '\n';
+    h += '<button onclick="cp(\'' + escAttr(plain) + '\')" class="abtn abs" style="margin-top:6px"><i class="fas fa-copy"></i>Salin Log</button>';
+  }
+  return h;
+}
+
+/* ===== RENDER: HISTORY ===== */
+function rHist() {
+  if (hist.length === 0) return '<div class="empty"><i class="fas fa-clock-rotate-left"></i><p style="font-size:11px">Belum ada riwayat</p></div>';
+  var h = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:11px;font-weight:700;color:var(--accent)"><i class="fas fa-clock-rotate-left" style="margin-right:5px"></i>'+hist.length+' entri</span><button onclick="clrH()" style="background:none;border:1px solid var(--border);border-radius:5px;padding:3px 7px;color:var(--red);font-size:9px;cursor:pointer;font-family:inherit">Hapus Semua</button></div>';
+  for (var i = 0; i < hist.length; i++) {
+    var hi = hist[i];
+    h += '<div class="hi" onclick="document.getElementById(\'ipInput\').value=\''+escAttr(hi.ip)+'\';traceIP(\''+escAttr(hi.ip)+'\')"><div style="flex:1;min-width:0"><div class="hip">'+hi.ip+' <span style="font-size:7px;color:var(--txt2)">'+(hi.src||'')+'</span></div><div class="hil">'+(hi.city||'?')+', '+(hi.country||'?')+'</div></div><span class="hit">'+tAgo(hi.time)+'</span><button class="hid" onclick="event.stopPropagation();delH('+i+')"><i class="fas fa-trash-can"></i></button></div>';
+  }
+  return h;
+}
+
+/* ===== BOTTOM SHEET DRAG ===== */
+(function() {
+  var sh = document.getElementById('sheet'), hd = document.getElementById('bhandle');
+  var sY = 0, sT = 0, drag = false;
+
+  function sheetHeight() {
+    var sab = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sab')) || 0;
+    return sh.scrollHeight - 60 - sab;
+  }
+  function currentY() {
+    var st = getComputedStyle(sh).transform;
+    if (st && st !== 'none') {
+      var m = st.match(/matrix\((.+)\)/);
+      if (m) return parseFloat(m[1].split(', ')[5]);
+    }
+    return sh.classList.contains('col') ? sheetHeight() : 0;
+  }
+  function oS(y) { drag = true; sY = y; sT = currentY(); sh.classList.add('dragging'); }
+  function oM(y) {
+    if (!drag) return;
+    var n = sT + (y - sY);
+    var mh = sheetHeight();
+    n = Math.max(0, Math.min(mh, n));
+    sh.style.transform = 'translateY(' + n + 'px)';
+  }
+  function oE() {
+    if (!drag) return;
+    drag = false;
+    sh.classList.remove('dragging');
+    var finalY = currentY();
+    sh.style.transform = '';
+    sh.classList.remove('col', 'exp');
+    sh.classList.add(finalY > sheetHeight() * 0.4 ? 'col' : 'exp');
+  }
+
+  hd.addEventListener('touchstart', function(e) { oS(e.touches[0].clientY); }, { passive: true });
+  document.addEventListener('touchmove', function(e) { if (drag) oM(e.touches[0].clientY); }, { passive: true });
+  document.addEventListener('touchend', oE);
+  hd.addEventListener('mousedown', function(e) { e.preventDefault(); oS(e.clientY); });
+  document.addEventListener('mousemove', function(e) { if (drag) oM(e.clientY); });
+  document.addEventListener('mouseup', oE);
+  hd.addEventListener('click', function(e) {
+    if (Math.abs(e.clientY - sY) < 5) {
+      if (sh.classList.contains('col')) { sh.classList.remove('col'); sh.classList.add('exp'); }
+      else { sh.classList.remove('exp'); sh.classList.add('col'); }
+    }
+  });
+})();
+
+/* ===== KEYBOARD ===== */
+document.getElementById('ipInput').addEventListener('keydown', function(e) { if (e.key === 'Enter') traceIP(); });
+map.on('click', function() {
+  var s = document.getElementById('sheet');
+  if (s.classList.contains('exp') && !s.classList.contains('dragging')) {
+    s.classList.remove('exp'); s.classList.add('col');
+  }
+});
+</script>
+</body>
+</html>
